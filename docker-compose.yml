@@ -1,0 +1,64 @@
+name: college_practise_2
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: ./docker/prod/Dockerfile
+      target: nginx
+    image: college_practise_2/nginx
+    restart: unless-stopped
+    ports:
+      - '${APP_PORT:-8090}:80'
+    networks:
+      - app
+    depends_on:
+      - app
+
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/prod/Dockerfile
+      target: app
+    image: college_practise_2/app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: local
+      APP_DEBUG: 'true'
+      DB_CONNECTION: pgsql
+      DB_HOST: pgsql
+      DB_PORT: 5432
+    networks:
+      - app
+    depends_on:
+      pgsql:
+        condition: service_healthy
+
+  pgsql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: '${DB_DATABASE:?DB_DATABASE is required}'
+      POSTGRES_USER: '${DB_USERNAME:?DB_USERNAME is required}'
+      POSTGRES_PASSWORD: '${DB_PASSWORD:?DB_PASSWORD is required}'
+    volumes:
+      - pgsql-data:/var/lib/postgresql/data
+    networks:
+      - app
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+networks:
+  app:
+    name: college_practise_2
+    driver: bridge
+
+volumes:
+  pgsql-data:
+    name: college_practise_2-pgsql
+    driver: local
